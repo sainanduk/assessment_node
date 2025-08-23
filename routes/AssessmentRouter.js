@@ -37,7 +37,7 @@ const optionCtrl = new OptionController({
 
 // Assessment routes
 router.get('/assessments', assessmentCtrl.list);
-router.get('/assessments/:id', assessmentCtrl.get);
+router.get('/assessments/:assessment_id', assessmentCtrl.get);
 router.post('/assessments', assessmentCtrl.create);
 router.put('/assessments/:id', assessmentCtrl.update);
 router.patch('/assessments/:id', assessmentCtrl.update);

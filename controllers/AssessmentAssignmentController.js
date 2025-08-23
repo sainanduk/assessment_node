@@ -90,6 +90,7 @@ async list(req, res) {
       // Map database fields to frontend interface fields
       const response = {
         id: assessment.id,
+        assignmentId: assignmentData.id,
         title: assessment.title,
         description: assessment.description,
         duration: assessment.totalDuration, // totalDuration -> duration

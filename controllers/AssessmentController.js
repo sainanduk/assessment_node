@@ -67,14 +67,17 @@ class AssessmentController {
   // ---------- GET ----------
   async get(req, res) {
     try {
-      const id = req.params.id;
+      const id = req.params.assessment_id;
       const cacheKey = `assessment:${id}`;
 
       const cached = await redis.get(cacheKey);
       if (cached) {
         return res.json(JSON.parse(cached));
       }
-
+      console.log("this is assessment by id");
+      
+      console.log("Fetching assessment ID:", id);
+      
       const assessment = await this.Assessment.findByPk(id, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
         include: [
