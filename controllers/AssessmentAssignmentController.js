@@ -48,7 +48,7 @@ async list(req, res) {
           include: [
             {
               model: this.ProctoringSetting,
-              as: 'ProctoringSetting',
+              as: 'proctoring_settings',
               required: false
             }
           ]
@@ -70,6 +70,10 @@ async list(req, res) {
     console.log("Fetched assignments:", rows);
 
     // Process each assignment to match frontend Assessment interface
+    // console.log("Processing assignments for response...");
+    // console.log("Rows:", JSON.stringify(rows, null, 2));
+    
+    
     const processedData = rows.map(assignment => {
       const assignmentData = assignment.toJSON();
       const assessment = assignmentData.Assessment;
@@ -98,8 +102,6 @@ async list(req, res) {
         passing_score: assessment.passing_score, // Updated field name
         instructions: assessment.instructions,
         is_proctored: assessment.is_proctored || false, // Updated field name
-        created_at: assessment.createdAt,
-        updated_at: assessment.updatedAt,
         status: assessment.status,
         difficulty: assessment.difficulty || "medium", // Updated field name
         time_limit: assessment.time_limit || true, // Updated field name
@@ -114,13 +116,12 @@ async list(req, res) {
         type: assessment.type,
         startTime: assessment.startTime,
         endTime: assessment.endTime,
-        userId: req.query.userId, // From query params
         attempt_Status: attemptStatus
       };
 
       // Add proctoring_settings matching the updated ProctoringSettings interface
-      if (assessment.ProctoringSetting) {
-        const proctoring = assessment.ProctoringSetting;
+      if (assessment.proctoring_settings) {
+        const proctoring = assessment.proctoring_settings;
         response.proctoring_settings = {
           voice_monitoring: proctoring.voice_monitoring || false,
           face_proctoring: proctoring.face_proctoring || true,

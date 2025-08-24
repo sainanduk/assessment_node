@@ -22,6 +22,7 @@ module.exports = (sequelize, DataTypes) => {
           key: "userId"
         }
       },
+      
       attemptNumber: {
         type: DataTypes.INTEGER,
         allowNull: false

@@ -99,9 +99,11 @@ class AttemptController {
 async create(req, res) {
   const t = await this.sequelize.transaction();
   try {
-    const { assignmentId, ipAddress, userAgent } = req.body;
+    const { ipAddress, userAgent } = req.body;
     const { userId, instituteId, batchId } = req.body; // from middleware
-
+    const assignmentId = 2;
+    console.log("Create attempt called with", { assignmentId, userId, instituteId, batchId });
+    
     if (!assignmentId || !userId) {
       await t.rollback();
       return res.status(400).json({ error: 'BadRequest', message: 'assignmentId and userId are required' });

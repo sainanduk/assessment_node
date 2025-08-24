@@ -18,7 +18,7 @@ const attemptCtrl = new AttemptController({
 // Prefix: /attempts
 router.get("/attempts", attemptCtrl.list);
 router.get("/attempts/:id", attemptCtrl.get);
-router.post("/attempts", attemptCtrl.create);
+router.post("/attempts/:assessmentId", attemptCtrl.create);
 router.post("/attempts/:id/submit", attemptCtrl.submit);      // special submit endpoint
 router.patch("/attempts/:id/meta", attemptCtrl.updateMeta);   // update meta info
 router.put("/attempts/:id/meta", attemptCtrl.updateMeta);     // allow PUT as well

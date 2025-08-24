@@ -21,23 +21,23 @@ User.hasMany(Assessment, { foreignKey: 'userId' });
 Assessment.belongsTo(User, { foreignKey: 'userId' });
 
 // Assessment - Section (One-to-Many)
-Assessment.hasMany(Section, { foreignKey: 'assessmentId' });
+Assessment.hasMany(Section, { foreignKey: 'assessmentId', as: 'sections' });
 Section.belongsTo(Assessment, { foreignKey: 'assessmentId' });
 
 // Section - Question (One-to-Many)
-Section.hasMany(Question, { foreignKey: 'sectionId' });
+Section.hasMany(Question, { foreignKey: 'sectionId', as: 'questions' });
 Question.belongsTo(Section, { foreignKey: 'sectionId' });
 
 // Question - Option (One-to-Many)
-Question.hasMany(Option, { foreignKey: 'questionId' });
+Question.hasMany(Option, { foreignKey: 'questionId', as: 'options' });
 Option.belongsTo(Question, { foreignKey: 'questionId' });
 
 // Assessment - AssessmentAssignment (One-to-Many)
 Assessment.hasMany(AssessmentAssignment, { foreignKey: 'assessmentId' });
-AssessmentAssignment.belongsTo(Assessment, { foreignKey: 'assessmentId' });
+AssessmentAssignment.belongsTo(Assessment, { foreignKey: 'assessmentId', as: 'Assessment' });
 
 // AssessmentAssignment - Attempt (One-to-Many)
-AssessmentAssignment.hasMany(Attempt, { foreignKey: 'assignmentId' });
+AssessmentAssignment.hasMany(Attempt, { foreignKey: 'assignmentId', as: 'Attempts' });
 Attempt.belongsTo(AssessmentAssignment, { foreignKey: 'assignmentId' });
 
 // Batch - User (One-to-Many)
@@ -68,7 +68,7 @@ ProctoringLog.belongsTo(Attempt, {foreignKey: 'attemptId',as: 'attempt'});
 // Assessment - ProctoringSetting (One-to-One)
 Assessment.hasOne(ProctoringSetting, {
   foreignKey: 'assessmentId',
-  as: 'ProctoringSetting',
+  as: 'proctoring_settings',
   onDelete: 'CASCADE'
 });
 

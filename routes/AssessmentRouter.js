@@ -16,7 +16,8 @@ const assessmentCtrl = new AssessmentController({
   Section: db.Section,
   Question: db.Question,
   Option: db.Option,
-  ProctoringSetting: db.ProctoringSetting
+  ProctoringSetting: db.ProctoringSetting,
+  AssessmentAssignment: db.AssessmentAssignment
 });
 
 const sectionCtrl = new SectionController({

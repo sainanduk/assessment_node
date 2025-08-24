@@ -68,6 +68,8 @@ class AssessmentController {
   async get(req, res) {
     try {
       const id = req.params.assessment_id;
+      const batchId =1;
+      const instituteId=1;
       const cacheKey = `assessment:${id}`;
 
       const cached = await redis.get(cacheKey);
@@ -77,27 +79,34 @@ class AssessmentController {
       console.log("this is assessment by id");
       
       console.log("Fetching assessment ID:", id);
-      
+
+      const assignments = await this.AssessmentAssignment.findAll({
+        where: { assessmentId: id,batchId: batchId, instituteId: instituteId},
+        attributes: ['id', 'instituteId', 'batchId', 'createdAt']
+      });
+      if (!assignments || assignments.length === 0) {
+        return res.status(403).json({ error: 'Forbidden', message: 'You do not have access to this assessment' });
+      }
       const assessment = await this.Assessment.findByPk(id, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
         include: [
           {
             model: this.Section,
-            as: 'Sections',
+            as: 'sections',
             attributes: { exclude: ['createdAt', 'updatedAt'] },
             separate: true,
             order: [['sectionOrder', 'ASC']],
             include: [
               {
                 model: this.Question,
-                as: 'Questions',
+                as: 'questions',
                 attributes: { exclude: ['createdAt', 'updatedAt'] },
                 separate: true,
                 include: [
                   {
                     model: this.Option,
-                    as: 'Options',
-                    attributes: { exclude: ['createdAt', 'updatedAt'] },
+                    as: 'options',
+                    attributes: { exclude: ['isCorrect','questionId','createdAt', 'updatedAt'] },
                     separate: true,
                     order: [['optionOrder', 'ASC']]
                   }
@@ -107,7 +116,7 @@ class AssessmentController {
           },
           { 
             model: this.ProctoringSetting, 
-            as: 'ProctoringSetting',
+            as: 'proctoring_settings',
             attributes: { exclude: ['createdAt', 'updatedAt'] }
           }
         ]
@@ -128,11 +137,11 @@ class AssessmentController {
   async create(req, res) {
     const t = await this.sequelize.transaction();
     try {
-      const { title, description, instructions, totalMarks = 0, totalDuration, passingMarks,
+      const { title, description, instructions, totalMarks = 0, duration, passing_score,
               status = 'draft', startTime, endTime, proctoring, sections } = req.body;
 
       const assessment = await this.Assessment.create(
-        { title, description, instructions, totalMarks, totalDuration, passingMarks, status, startTime, endTime },
+        { title, description, instructions, totalMarks, duration, passing_score, status, startTime, endTime },
         { transaction: t }
       );
 
