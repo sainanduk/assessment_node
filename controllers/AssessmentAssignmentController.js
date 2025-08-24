@@ -93,22 +93,19 @@ async list(req, res) {
         assignmentId: assignmentData.id,
         title: assessment.title,
         description: assessment.description,
-        duration: assessment.totalDuration, // totalDuration -> duration
-        total_questions: assessment.totalQuestions || 0, // add if available in your db
-        passing_score: assessment.passingMarks, // passingMarks -> passing_score
+        duration: assessment.duration, // Updated field name
+        total_questions: assessment.total_questions || 0, // Updated field name
+        passing_score: assessment.passing_score, // Updated field name
         instructions: assessment.instructions,
-        is_proctored: assessment.ProctoringSetting?.enableProctoring || false,
+        is_proctored: assessment.is_proctored || false, // Updated field name
         created_at: assessment.createdAt,
         updated_at: assessment.updatedAt,
         status: assessment.status,
-        tags: assessment.tags || [], // add if available in your db
-        difficulty: assessment.difficulty || "medium", // add if available in your db  
-        category: assessment.category || "", // add if available in your db
-        time_limit: Boolean(assessment.totalDuration), // based on whether duration exists
-        allow_review: assessment.allowReview || false, // add if available in your db
-        show_results: assessment.showResults || false, // add if available in your db
-        shuffle_questions: assessment.shuffleQuestions || false, // add if available in your db
-        shuffle_options: assessment.shuffleOptions || false, // add if available in your db
+        difficulty: assessment.difficulty || "medium", // Updated field name
+        time_limit: assessment.time_limit || true, // Updated field name
+        show_results: assessment.show_results || false, // Updated field name
+        shuffle_questions: assessment.shuffle_questions || false, // Updated field name
+        shuffle_options: assessment.shuffle_options || false, // Updated field name
         
         // Additional fields from your current response
         assessmentId: assessment.id,
@@ -117,26 +114,26 @@ async list(req, res) {
         type: assessment.type,
         startTime: assessment.startTime,
         endTime: assessment.endTime,
-        userId: assessment.userId,
+        userId: req.query.userId, // From query params
         attempt_Status: attemptStatus
       };
 
-      // Add proctoring_settings matching the ProctoringSettings interface
+      // Add proctoring_settings matching the updated ProctoringSettings interface
       if (assessment.ProctoringSetting) {
         const proctoring = assessment.ProctoringSetting;
         response.proctoring_settings = {
-          voice_monitoring: proctoring.settingsJson?.voice_monitoring || false,
-          face_proctoring: proctoring.faceDetection || false,
-          electronic_monitoring: proctoring.screenRecording || false,
-          is_fullscreen: proctoring.fullScreenRequired || false,
-          auto_terminate: proctoring.autoSubmitOnViolation || false,
-          termination_threshold: proctoring.settingsJson?.termination_threshold || 5,
-          warning_threshold: proctoring.settingsJson?.warning_threshold || 3,
-          max_tab_switches: proctoring.maxTabSwitches || 0,
-          max_face_not_detected_time: proctoring.settingsJson?.max_face_not_detected_time || 30,
-          max_voice_detected_time: proctoring.settingsJson?.max_voice_detected_time || 30,
-          max_multiple_faces_time: proctoring.settingsJson?.max_multiple_faces_time || 10,
-          notification_email: proctoring.settingsJson?.notification_email || ""
+          voice_monitoring: proctoring.voice_monitoring || false,
+          face_proctoring: proctoring.face_proctoring || true,
+          electronic_monitoring: proctoring.electronic_monitoring || false,
+          is_fullscreen: proctoring.is_fullscreen || true,
+          auto_terminate: proctoring.auto_terminate || true,
+          termination_threshold: proctoring.termination_threshold || 5,
+          warning_threshold: proctoring.warning_threshold || 3,
+          max_tab_switches: proctoring.max_tab_switches || 3,
+          max_face_not_detected_time: proctoring.max_face_not_detected_time || 30,
+          max_voice_detected_time: proctoring.max_voice_detected_time || 30,
+          max_multiple_faces_time: proctoring.max_multiple_faces_time || 10,
+          notification_email: proctoring.notification_email || ""
         };
       }
       

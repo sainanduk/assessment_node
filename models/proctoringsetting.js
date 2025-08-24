@@ -15,49 +15,57 @@ module.exports = (sequelize, DataTypes) => {
       },
       onDelete: "CASCADE"
     },
-    enableProctoring: {
+    voice_monitoring: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
     },
-    fullScreenRequired: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    disableCopyPaste: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    disableRightClick: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    tabSwitchDetection: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    maxTabSwitches: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0
-    },
-    faceDetection: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    screenRecording: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    autoSubmitOnViolation: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    warningBeforeAction: {
+    face_proctoring: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
     },
-    settingsJson: {
-      type: DataTypes.JSONB,
-      allowNull: true
+    electronic_monitoring: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    is_fullscreen: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+    },
+    auto_terminate: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+    },
+    termination_threshold: {
+      type: DataTypes.INTEGER,
+      defaultValue: 5
+    },
+    warning_threshold: {
+      type: DataTypes.INTEGER,
+      defaultValue: 3
+    },
+    max_tab_switches: {
+      type: DataTypes.INTEGER,
+      defaultValue: 3
+    },
+    max_face_not_detected_time: {
+      type: DataTypes.INTEGER,
+      defaultValue: 30,
+      comment: 'Time in seconds'
+    },
+    max_voice_detected_time: {
+      type: DataTypes.INTEGER,
+      defaultValue: 30,
+      comment: 'Time in seconds'
+    },
+    max_multiple_faces_time: {
+      type: DataTypes.INTEGER,
+      defaultValue: 10,
+      comment: 'Time in seconds'
+    },
+    notification_email: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      defaultValue: ''
     },
     createdAt: {
       type: DataTypes.DATE,

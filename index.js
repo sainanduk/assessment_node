@@ -1,47 +1,3 @@
-// require('dotenv').config();
-// const express = require('express');
-// const cors = require('cors');
-// const { sequelize, ...models } = require('./models');
-
-// const app = express();
-// const PORT = process.env.PORT || 3000;
-
-// app.use(cors());
-// app.use(express.json());
-
-
-// const initializeDatabase = async () => {
-//   try {
-//     // Test connection
-//     await sequelize.authenticate({force:true});
-//     console.log('✅ Database connected successfully.');
-
-//     // Sync all models with force: true (drops and recreates tables)
-//     console.log('\n🔄 Starting database synchronization...');
-//     await sequelize.sync({force:true});
-//     console.log('✅ All tables created successfully');
-    
-//   } catch (err) {
-//     console.error('❌ Unable to connect to the database:', err);
-//     process.exit(1);
-//   }
-// };
-
-// initializeDatabase();
-
-// app.get('/', (req, res) => {
-//   res.json({ message: 'Supabase PostgreSQL connected!' });
-// });
-
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
-
-
-
-
 // server.js
 require('dotenv').config();
 const express = require('express');
@@ -49,7 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const db = require('./models'); // expects index.js exporting sequelize and models
-const apiRoutes = require('./routes/AssessmentRouter'); // central router that aggregates all resource routes
+const assessmentRoutes = require('./routes/AssessmentRouter'); // central router that aggregates all resource routes
 const institueRoutes = require('./routes/InstituteRouter');
 const batchroutes = require('./routes/BatchRouter');
 const userRoutes = require('./routes/UserRouter');
@@ -69,7 +25,7 @@ app.use(morgan('dev'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // API routes (single aggregated router)
-app.use('/api', apiRoutes);
+app.use('/api', assessmentRoutes);
 app.use('/api', institueRoutes);
 app.use('/api', batchroutes);
 app.use('/api', userRoutes);
