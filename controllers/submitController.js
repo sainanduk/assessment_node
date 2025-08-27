@@ -11,7 +11,8 @@ class SubmissionController {
     Section, 
     Question, 
     Option,
-    AssessmentAssignment 
+    AssessmentAssignment,
+    Report
   }) {
     this.sequelize = sequelize;
     this.Submission = Submission;
@@ -21,11 +22,13 @@ class SubmissionController {
     this.Question = Question;
     this.Option = Option;
     this.AssessmentAssignment = AssessmentAssignment;
+    this.Report = Report;
 
     this.create = this.create.bind(this);
     this.getAssessmentData = this.getAssessmentData.bind(this);
     this.validateSubmission = this.validateSubmission.bind(this);
     this.getByAttempt = this.getByAttempt.bind(this);
+    this.finalSubmit = this.finalSubmit.bind(this);
   }
 
   // ---------- GET ASSESSMENT DATA WITH CACHING (OPTIMIZED) ----------
@@ -346,6 +349,303 @@ class SubmissionController {
     }
   }
 
+  // ---------- FINAL SUBMIT ----------
+  async finalSubmit(req, res) {
+    const t = await this.sequelize.transaction();
+    
+    try {
+      const { attemptId } = req.body;
+
+      // Basic validation
+      if (!attemptId || isNaN(attemptId)) {
+        await t.rollback();
+        return res.status(400).json({
+          error: "ValidationError",
+          details: "Valid attemptId is required"
+        });
+      }
+
+      // Get attempt with assignment details
+      const attempt = await this.Attempt.findByPk(attemptId, {
+        include: [
+          {
+            model: this.AssessmentAssignment,
+            as: "assignment",
+            attributes: ["id", "assessmentId"]
+          }
+        ],
+        transaction: t
+      });
+
+      if (!attempt) {
+        await t.rollback();
+        return res.status(404).json({
+          error: "NotFound",
+          details: "Attempt not found"
+        });
+      }
+
+      // Check if attempt is still in progress
+      if (attempt.status !== 'in_progress') {
+        await t.rollback();
+        return res.status(400).json({
+          error: "InvalidAttemptStatus",
+          details: "Attempt is already completed or not in progress"
+        });
+      }
+
+      // Get all submissions for this attempt
+      const submissions = await this.Submission.findAll({
+        where: { attemptId },
+        transaction: t
+      });
+
+      // Cache assessment data for frequent access (1 hour)
+      const assessmentCacheKey = `assessment:${attempt.assignment.assessmentId}:scoring_data`;
+      let assessment = null;
+      
+      const cachedAssessment = await redis.get(assessmentCacheKey);
+      if (cachedAssessment) {
+        assessment = JSON.parse(cachedAssessment);
+      } else {
+        // Get assessment with questions, options, and sections for scoring
+        assessment = await this.Assessment.findByPk(attempt.assignment.assessmentId, {
+          include: [
+            {
+              model: this.Section,
+              as: 'sections',
+              include: [
+                {
+                  model: this.Question,
+                  as: 'questions',
+                  include: [
+                    {
+                      model: this.Option,
+                      as: 'options',
+                      attributes: ['id', 'isCorrect']
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          transaction: t
+        });
+
+        if (!assessment) {
+          await t.rollback();
+          return res.status(404).json({
+            error: "NotFound",
+            details: "Assessment not found"
+          });
+        }
+
+        // Cache assessment data for 1 hour
+        await redis.set(assessmentCacheKey, JSON.stringify(assessment), "EX", 3600);
+      }
+
+      // Calculate scores
+      let totalScore = 0;
+      const sectionScores = {};
+      const questionResults = [];
+
+      // Handle case where there are no submissions
+      if (submissions.length === 0) {
+        // Create report with zero score for empty submission
+        const existingReport = await this.Report.findOne({
+          where: {
+            userId: attempt.userId,
+            assessmentAssignmentId: attempt.assignmentId,
+            assessmentId: attempt.assignment.assessmentId
+          },
+          transaction: t
+        });
+
+        let report;
+        if (existingReport) {
+          // Update existing report with zero score
+          existingReport.score = 0;
+          existingReport.sectionScores = {};
+          await existingReport.save({ transaction: t });
+          report = existingReport;
+        } else {
+          // Create new report with zero score
+          report = await this.Report.create({
+            userId: attempt.userId,
+            assessmentAssignmentId: attempt.assignmentId,
+            assessmentId: attempt.assignment.assessmentId,
+            score: 0,
+            sectionScores: {}
+          }, { transaction: t });
+        }
+
+        // Mark attempt as completed
+        attempt.status = 'completed';
+        attempt.completedAt = new Date();
+        await attempt.save({ transaction: t });
+
+        await t.commit();
+
+        // Invalidate related caches
+        await redis.del(`attempt:${attemptId}`);
+        await redis.del(`submissions:attempt:${attemptId}`);
+        await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assignment.assessmentId}`);
+
+        return res.status(200).json({
+          data: {
+            attemptId: attempt.id,
+            status: attempt.status,
+            completedAt: attempt.completedAt,
+            totalScore: 0,
+            sectionScores: {},
+            reportId: report.id,
+            questionResults: [],
+            message: "Assessment submitted with no answers"
+          },
+          message: "Assessment submitted successfully (no submissions)"
+        });
+      }
+
+      // Process each submission
+      for (const submission of submissions) {
+        const question = assessment.sections
+          .flatMap(section => section.questions)
+          .find(q => q.id === submission.questionId);
+
+        if (!question) {
+          console.warn(`Question ${submission.questionId} not found in assessment`);
+          continue;
+        }
+
+        const section = assessment.sections.find(s => 
+          s.questions.some(q => q.id === question.id)
+        );
+
+        if (!section) {
+          console.warn(`Section not found for question ${submission.questionId}`);
+          continue;
+        }
+
+        // Get correct options for this question
+        const correctOptions = question.options.filter(option => option.isCorrect);
+        const selectedOptions = submission.selectedOptions || [];
+
+        // Calculate question score
+        let questionScore = 0;
+        let isCorrect = false;
+
+        if (question.type === 'single_correct') {
+          // For single correct questions
+          if (selectedOptions.length === 1 && correctOptions.length === 1) {
+            const selectedOption = correctOptions.find(opt => opt.id === selectedOptions[0]);
+            if (selectedOption) {
+              questionScore = question.marks;
+              isCorrect = true;
+            }
+          }
+        } else if (question.type === 'multi_correct') {
+          // For multiple correct questions
+          const correctOptionIds = correctOptions.map(opt => opt.id);
+          const selectedCorrectCount = selectedOptions.filter(id => correctOptionIds.includes(id)).length;
+          const selectedIncorrectCount = selectedOptions.filter(id => !correctOptionIds.includes(id)).length;
+          const totalCorrectCount = correctOptions.length;
+
+          if (selectedCorrectCount === totalCorrectCount && selectedIncorrectCount === 0) {
+            // All correct options selected and no incorrect options
+            questionScore = question.marks;
+            isCorrect = true;
+          } else if (selectedCorrectCount > 0) {
+            // Partial credit: (correct selected - incorrect selected) / total correct
+            const partialScore = Math.max(0, (selectedCorrectCount - selectedIncorrectCount) / totalCorrectCount);
+            questionScore = question.marks * partialScore;
+          }
+        }
+
+        // Apply negative marking if applicable
+        if (!isCorrect && question.negativeMarks > 0) {
+          questionScore = -question.negativeMarks;
+        }
+
+        // Add to total score
+        totalScore += questionScore;
+
+        // Add to section score
+        if (!sectionScores[section.id]) {
+          sectionScores[section.id] = 0;
+        }
+        sectionScores[section.id] += questionScore;
+
+        // Store question result for debugging
+        questionResults.push({
+          questionId: question.id,
+          questionType: question.type,
+          marks: question.marks,
+          negativeMarks: question.negativeMarks,
+          correctOptions: correctOptions.map(opt => opt.id),
+          selectedOptions: selectedOptions,
+          score: questionScore,
+          isCorrect: isCorrect
+        });
+      }
+
+      // Create or update report
+      const existingReport = await this.Report.findOne({
+        where: {
+          userId: attempt.userId,
+          assessmentAssignmentId: attempt.assignmentId,
+          assessmentId: attempt.assignment.assessmentId
+        },
+        transaction: t
+      });
+
+      let report;
+      if (existingReport) {
+        // Update existing report
+        existingReport.score = totalScore;
+        existingReport.sectionScores = sectionScores;
+        await existingReport.save({ transaction: t });
+        report = existingReport;
+      } else {
+        // Create new report
+        report = await this.Report.create({
+          userId: attempt.userId,
+          assessmentAssignmentId: attempt.assignmentId,
+          assessmentId: attempt.assignment.assessmentId,
+          score: totalScore,
+          sectionScores: sectionScores
+        }, { transaction: t });
+      }
+
+      // Mark attempt as completed
+      attempt.status = 'completed';
+      attempt.completedAt = new Date();
+      await attempt.save({ transaction: t });
+
+      await t.commit();
+
+      // Invalidate related caches
+      await redis.del(`attempt:${attemptId}`);
+      await redis.del(`submissions:attempt:${attemptId}`);
+      await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assignment.assessmentId}`);
+
+      return res.status(200).json({
+        data: {
+          attemptId: attempt.id,
+          status: attempt.status,
+          completedAt: attempt.completedAt,
+          totalScore: totalScore,
+          sectionScores: sectionScores,
+          reportId: report.id,
+          questionResults: questionResults // For debugging/transparency
+        },
+        message: "Assessment submitted successfully"
+      });
+
+    } catch (err) {
+      await t.rollback();
+      return Utils.handleSequelizeError(err, res);
+    }
+  }
 
 }
 

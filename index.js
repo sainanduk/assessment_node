@@ -11,6 +11,7 @@ const batchroutes = require('./routes/BatchRouter');
 const userRoutes = require('./routes/UserRouter');
 const assessmentAssignmentRoutes = require('./routes/AssessmentAssignmentRouter');
 const AttemptRouter = require('./routes/AttemptRouter');
+const submitRoutes = require('./routes/SubmitRouter');
 
 
 const app = express();
@@ -31,6 +32,7 @@ app.use('/api', batchroutes);
 app.use('/api', userRoutes);
 app.use('/api', assessmentAssignmentRoutes);
 app.use('/api', AttemptRouter);
+app.use('/api', submitRoutes);
 
 // 404 handler for unknown routes
 app.use((req, res, next) => {
