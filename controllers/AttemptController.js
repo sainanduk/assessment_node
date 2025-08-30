@@ -5,17 +5,13 @@ const redis = require('../config/redis'); // your redis connection
 
 /**
  * Assumptions:
- * - AssessmentAssignment model exists and links to Assessment via assessmentId
  * - Assessment model has a field attemptsAllowed (number of attempts permitted per user for that assessment)
- * - Associations (ensure these in your model setup):
- *    Attempt.belongsTo(AssessmentAssignment, { as: 'assignment', foreignKey: 'assignmentId' });
- *    AssessmentAssignment.belongsTo(Assessment, { as: 'assessment', foreignKey: 'assessmentId' });
+ * - Attempt model directly links to Assessment via assessmentId
  */
 class AttemptController {
-  constructor({ sequelize, Attempt, AssessmentAssignment, Assessment, User }) {
+  constructor({ sequelize, Attempt, Assessment, User }) {
     this.sequelize = sequelize;
     this.Attempt = Attempt;
-    this.AssessmentAssignment = AssessmentAssignment;
     this.Assessment = Assessment;
     this.User = User;
 
@@ -35,7 +31,7 @@ class AttemptController {
       const where = {};
 
       if (req.query.userId) where.userId = req.query.userId;
-      if (req.query.assignmentId) where.assignmentId = req.query.assignmentId;
+      if (req.query.assessmentId) where.assessmentId = req.query.assessmentId;
       if (req.query.status) where.status = req.query.status;
       if (req.query.from || req.query.to) {
         where.startedAt = {};
@@ -100,62 +96,44 @@ async create(req, res) {
   const t = await this.sequelize.transaction();
   try {
     const { ipAddress, userAgent } = req.body;
-    const { userId, instituteId, batchId } = req.body; // from middleware
-    const assignmentId = 2;
-    console.log("Create attempt called with", { assignmentId, userId, instituteId, batchId });
+    const { userId } = req.body; // from middleware
+    const { assessmentId } = req.params;
+    console.log("Create attempt called with", { assessmentId, userId });
     
-    if (!assignmentId || !userId) {
+    if (!assessmentId || !userId) {
       await t.rollback();
-      return res.status(400).json({ error: 'BadRequest', message: 'assignmentId and userId are required' });
+      return res.status(400).json({ error: 'BadRequest', message: 'assessmentId and userId are required' });
     }
 
-    // 🔹 Step 1: Check cache for assignment-batch relation
-    const cacheKeyAssignment = `assignment:${assignmentId}:batch:${batchId}:institute:${instituteId}`;
-    const cacheKeyAssessment = `assessment:${assignmentId}`;
+    // 🔹 Step 1: Check cache for assessment
+    const cacheKeyAssessment = `assessment:${assessmentId}`;
 
     let assessmentData = await redis.get(cacheKeyAssessment);
-    let isAssigned = await redis.get(cacheKeyAssignment);
 
-    if (!isAssigned || !assessmentData) {
-      console.log("Cache miss for assignment or assessment, querying DB");
+    if (!assessmentData) {
+      console.log("Cache miss for assessment, querying DB");
       
-const assignment = await this.AssessmentAssignment.findOne({
-  where: { id: assignmentId, instituteId, batchId },
-  include: [
-    { 
-      model: this.Assessment, 
-      as: 'Assessment', // Changed from 'assessment' to 'Assessment'
-      attributes: ['id', 'title', 'attemptsAllowed', 'startTime', 'endTime', 'status'] 
-    }
-  ],
-  transaction: t
-});
+      const assessment = await this.Assessment.findByPk(assessmentId, {
+        attributes: ['id', 'title', 'attemptsAllowed', 'startTime', 'endTime', 'status'],
+        transaction: t
+      });
 
-
-      if (!assignment) {
+      if (!assessment) {
         await t.rollback();
-        return res.status(403).json({ error: 'Forbidden', message: 'Assessment not assigned to this batch' });
+        return res.status(404).json({ error: 'NotFound', message: 'Assessment not found' });
       }
 
-      assessmentData = assignment.Assessment ? assignment.Assessment.toJSON() : null; // Capital A
+      assessmentData = assessment.toJSON();
 
-      if (!assessmentData) {
-        await t.rollback();
-        return res.status(404).json({ error: 'NotFound', message: 'Assessment not linked to assignment' });
-      }
-
-      // cache assignment mapping and assessment details
-      await redis.set(cacheKeyAssignment, "true", "EX", 60); 
-      await redis.set(cacheKeyAssessment, JSON.stringify(assessmentData), "EX", 60 ); 
-
-      isAssigned = true;
+      // cache assessment details
+      await redis.set(cacheKeyAssessment, JSON.stringify(assessmentData), "EX", 60); 
     } else {
       assessmentData = JSON.parse(assessmentData);
     }
 
     // 🔹 Step 2: Check if user already has an in-progress attempt
     const attempts = await this.Attempt.findAll({
-      where: { assignmentId, userId },
+      where: { assessmentId, userId },
       transaction: t,
       lock: t.LOCK.UPDATE
     });
@@ -184,7 +162,7 @@ const assignment = await this.AssessmentAssignment.findOne({
       return res.status(403).json({ error: 'Forbidden', message: 'Assessment not available' });
     }
 
-    // 🔹 Step 4: Check attempt limits
+
     if (Number.isNaN(allowed) || allowed < 1) {
       await t.rollback();
       return res.status(403).json({ error: 'Forbidden', message: 'No attempts allowed for this assessment' });
@@ -196,7 +174,7 @@ const assignment = await this.AssessmentAssignment.findOne({
 
     // 🔹 Step 5: Create new attempt
     const attempt = await this.Attempt.create({
-      assignmentId,
+      assessmentId,
       userId,
       attemptNumber: attemptsCount + 1,
       status: 'in_progress',
@@ -206,8 +184,8 @@ const assignment = await this.AssessmentAssignment.findOne({
 
     await t.commit();
 
-    // Clear cache of attempts list for this user-assignment
-    await redis.del(`attempts:list:${assignmentId}:${userId}`);
+    // Clear cache of attempts list for this user-assessment
+    await redis.del(`attempts:list:${assessmentId}:${userId}`);
 
     return res.status(201).json({ data: attempt });
   } catch (err) {

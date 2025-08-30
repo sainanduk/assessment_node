@@ -4,14 +4,13 @@ const Utils = require('./utils');
 const redis = require('../config/redis'); // import your redis connection
 
 class AssessmentController {
-  constructor({ sequelize, Assessment, Section, Question, Option, ProctoringSetting, AssessmentAssignment }) {
+  constructor({ sequelize, Assessment, Section, Question, Option, ProctoringSetting }) {
     this.sequelize = sequelize;
     this.Assessment = Assessment;
     this.Section = Section;
     this.Question = Question;
     this.Option = Option;
     this.ProctoringSetting = ProctoringSetting;
-    this.AssessmentAssignment = AssessmentAssignment;
 
     this.list = this.list.bind(this);
     this.get = this.get.bind(this);
@@ -68,8 +67,6 @@ class AssessmentController {
   async get(req, res) {
     try {
       const id = req.params.assessment_id;
-      const batchId =1;
-      const instituteId=1;
       const cacheKey = `assessment:${id}`;
 
       const cached = await redis.get(cacheKey);
@@ -79,14 +76,6 @@ class AssessmentController {
       console.log("this is assessment by id");
       
       console.log("Fetching assessment ID:", id);
-
-      const assignments = await this.AssessmentAssignment.findAll({
-        where: { assessmentId: id,batchId: batchId, instituteId: instituteId},
-        attributes: ['id', 'instituteId', 'batchId', 'createdAt']
-      });
-      if (!assignments || assignments.length === 0) {
-        return res.status(403).json({ error: 'Forbidden', message: 'You do not have access to this assessment' });
-      }
       const assessment = await this.Assessment.findByPk(id, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
         include: [
@@ -137,57 +126,153 @@ class AssessmentController {
   async create(req, res) {
     const t = await this.sequelize.transaction();
     try {
-      const { title, description, instructions, totalMarks = 0, duration, passing_score,
-              status = 'draft', startTime, endTime, proctoring, sections } = req.body;
-
+      const { 
+        title, description, instructions, totalMarks = 0, duration, passing_score,
+        status = 'draft', startTime, endTime, proctoring, sections 
+      } = req.body;
+  
+      if (!title || typeof title !== "string" || !title.trim()) {
+        return res.status(400).json({ success: false, message: "Title is required." });
+      }
+  
+      if (!duration || typeof duration !== "number" || duration <= 0) {
+        return res.status(400).json({ success: false, message: "Duration must be a positive number (in minutes)." });
+      }
+  
+      if (!startTime || !endTime) {
+        return res.status(400).json({ success: false, message: "Start time and end time are required." });
+      }
+  
+      const now = new Date();
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+  
+    
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ success: false, message: "Invalid start or end time format." });
+      }
+  
+      if (start <= now) {
+        return res.status(400).json({ success: false, message: "Start time must be in the future." });
+      }
+  
+      if (end <= start) {
+        return res.status(400).json({ success: false, message: "End time must be after start time." });
+      }
+  
+      const expectedDuration = Math.floor((end - start) / (1000 * 60)); // in minutes
+      if (duration !== expectedDuration) {
+        return res.status(400).json({
+          success: false,
+          message: `Duration mismatch. Duration must equal the difference between start and end time (${expectedDuration} minutes).`
+        });
+      }
+      if(!sections || sections.length<=0){
+        return res.status(400).json({ success: false, message: "Atleast one section should be present" });
+      }
+  
+      // ✅ Create Assessment
       const assessment = await this.Assessment.create(
-        { title, description, instructions, totalMarks, duration, passing_score, status, startTime, endTime },
+        { title, description, instructions, totalMarks, duration, passing_score,section_count:section_count, status, startTime: start, endTime: end },
         { transaction: t }
       );
-
+  
+      // ✅ Proctoring settings
       if (proctoring) {
         await this.ProctoringSetting.create({ assessmentId: assessment.id, ...proctoring }, { transaction: t });
       }
+  
+      
+        if (Array.isArray(sections) && sections.length > 0) {
+    // ✅ Sum all section time limits
+    const totalSectionTime = sections.reduce((sum, s) => {
+      const time = s.timeLimit ?? 0;
+      return sum + (typeof time === "number" && time > 0 ? time : 0);
+    }, 0);
 
-      if (Array.isArray(sections) && sections.length) {
-        for (const s of sections) {
-          const section = await this.Section.create(
-            { assessmentId: assessment.id, name: s.name, description: s.description, sectionOrder: s.sectionOrder, marks: s.marks ?? 0, timeLimit: s.timeLimit ?? null, instructions: s.instructions ?? null },
-            { transaction: t }
-          );
+    if (totalSectionTime !== duration) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Sum of section time limits (${totalSectionTime} mins) must equal assessment duration (${duration} mins).`
+      });
+    }
 
-          if (Array.isArray(s.questions) && s.questions.length) {
-            for (const q of s.questions) {
-              const question = await this.Question.create(
-                { sectionId: section.id, questionText: q.questionText, marks: q.marks ?? 1, negativeMarks: q.negativeMarks ?? 0, type: q.type ?? 'single_correct', metadata: q.metadata ?? null },
-                { transaction: t }
-              );
-
-              if (Array.isArray(q.options) && q.options.length) {
-                const ops = q.options.map(o => ({
-                  questionId: question.id,
-                  optionText: o.optionText,
-                  isCorrect: Boolean(o.isCorrect),
-                  optionOrder: o.optionOrder
-                }));
-                await this.Option.bulkCreate(ops, { transaction: t });
-              }
-            }
-          }
-        }
+    for (const s of sections) {
+      // ✅ Validate name
+      if (!s.name || typeof s.name !== "string" || !s.name.trim()) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Section name is required." });
       }
 
+      // ✅ Validate sectionOrder
+      if (!s.sectionOrder || typeof s.sectionOrder !== "number" || s.sectionOrder <= 0) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Valid sectionOrder is required and must be > 0." });
+      }
+
+      // ✅ Check duplicate sectionOrder
+      const exists = await this.Section.findOne({
+        where: { assessmentId: assessment.id, sectionOrder: s.sectionOrder },
+        transaction: t
+      });
+      if (exists) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Section with order ${s.sectionOrder} already exists for this assessment.`
+        });
+      }
+
+      // ✅ Validate type
+      if (s.type && !["coding", "noncoding"].includes(s.type)) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Invalid section type. Must be 'coding' or 'noncoding'." });
+      }
+
+      // ✅ Validate marks
+      if (s.marks !== undefined && (typeof s.marks !== "number" || s.marks < 0)) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Marks must be a non-negative number." });
+      }
+
+      // ✅ Validate timeLimit
+      if (s.timeLimit === undefined || s.timeLimit === null || s.timeLimit <= 0) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Each section must have a valid positive timeLimit." });
+      }
+
+      // ✅ Create section
+      const section = await this.Section.create(
+        {
+          assessmentId: assessment.id,
+          name: s.name.trim(),
+          description: s.description ?? null,
+          type: s.type ?? "noncoding",
+          sectionOrder: s.sectionOrder,
+          marks: s.marks ?? 0,
+          timeLimit: s.timeLimit,
+          instructions: s.instructions ?? null
+        },
+        { transaction: t }
+      );
+
+    }
+  }
+
+  
       await t.commit();
-
-      // 🔑 Invalidate relevant cache
+  
+      // ✅ Invalidate cache
       await redis.del('assessments:list:*');
-
-      return res.status(201).json({ data: assessment });
+  
+      return res.status(201).json({ success: true, data: assessment });
     } catch (err) {
       await t.rollback();
       return Utils.handleSequelizeError(err, res);
     }
   }
+  
 
   // ---------- UPDATE ----------
   async update(req, res) {

@@ -6,15 +6,17 @@ const User = require('./users')(sequelize, DataTypes);
 const Assessment = require('./assessment')(sequelize, DataTypes);
 const Section = require('./section')(sequelize, DataTypes);
 const Question = require('./question')(sequelize, DataTypes);
+const QuestionBank = require('./questionbank')(sequelize, DataTypes);
+const ExternalCodingQuestion = require('./externalcodingquestion')(sequelize, DataTypes);
 const Option = require('./option')(sequelize, DataTypes);
-const AssessmentAssignment = require('./assessmentassignment')(sequelize, DataTypes);
 const Attempt = require('./attempt')(sequelize, DataTypes);
 const Batch = require('./batch')(sequelize, DataTypes);
 const Institute = require('./institute')(sequelize, DataTypes);
 const ProctoringSetting = require('./proctoringsetting')(sequelize, DataTypes);
 const Submission = require('./submission')(sequelize, DataTypes);
-const Report = require('./report')(sequelize, DataTypes); // 🔹 import Report
+const Report = require('./report')(sequelize, DataTypes);
 const ProctoringLog = require('./proctoringlog')(sequelize, DataTypes); 
+
 // Define associations
 // User - Assessment (One-to-Many)
 User.hasMany(Assessment, { foreignKey: 'userId' });
@@ -24,21 +26,29 @@ Assessment.belongsTo(User, { foreignKey: 'userId' });
 Assessment.hasMany(Section, { foreignKey: 'assessmentId', as: 'sections' });
 Section.belongsTo(Assessment, { foreignKey: 'assessmentId' });
 
-// Section - Question (One-to-Many)
+// Section - Question (One-to-Many) - for MCQ questions
 Section.hasMany(Question, { foreignKey: 'sectionId', as: 'questions' });
 Question.belongsTo(Section, { foreignKey: 'sectionId' });
 
-// Question - Option (One-to-Many)
-Question.hasMany(Option, { foreignKey: 'questionId', as: 'options' });
-Option.belongsTo(Question, { foreignKey: 'questionId' });
+// Section - ExternalCodingQuestion (One-to-Many) - for coding questions
+Section.hasMany(ExternalCodingQuestion, { foreignKey: 'sectionId', as: 'externalCodingQuestions' });
+ExternalCodingQuestion.belongsTo(Section, { foreignKey: 'sectionId' });
 
-// Assessment - AssessmentAssignment (One-to-Many)
-Assessment.hasMany(AssessmentAssignment, { foreignKey: 'assessmentId' });
-AssessmentAssignment.belongsTo(Assessment, { foreignKey: 'assessmentId', as: 'Assessment' });
+// Question - QuestionBank (Many-to-One)
+Question.belongsTo(QuestionBank, { foreignKey: 'questionBankId', as: 'questionBank' });
+QuestionBank.hasMany(Question, { foreignKey: 'questionBankId', as: 'questions' });
 
-// AssessmentAssignment - Attempt (One-to-Many)
-AssessmentAssignment.hasMany(Attempt, { foreignKey: 'assignmentId', as: 'Attempts' });
-Attempt.belongsTo(AssessmentAssignment, { foreignKey: 'assignmentId' });
+// QuestionBank - Option (One-to-Many)
+QuestionBank.hasMany(Option, { foreignKey: 'questionBankId', as: 'options' });
+Option.belongsTo(QuestionBank, { foreignKey: 'questionBankId' });
+
+// Question - Submission (One-to-Many)
+Question.hasMany(Submission, { foreignKey: 'questionId', as: 'submissions' });
+Submission.belongsTo(Question, { foreignKey: 'questionId' });
+
+// Assessment - Attempt (One-to-Many)
+Assessment.hasMany(Attempt, { foreignKey: 'assessmentId', as: 'attempts' });
+Attempt.belongsTo(Assessment, { foreignKey: 'assessmentId' });
 
 // Batch - User (One-to-Many)
 Batch.hasMany(User, { foreignKey: 'batchId' });
@@ -48,22 +58,13 @@ User.belongsTo(Batch, { foreignKey: 'batchId' });
 Institute.hasMany(Batch, { foreignKey: 'instituteId' });
 Batch.belongsTo(Institute, { foreignKey: 'instituteId' });
 
-// 🔹 Associations for Reports
-User.hasMany(Report, { foreignKey: 'userId' });
-Report.belongsTo(User, { foreignKey: 'userId' });
+// User - Attempt (One-to-Many)
+User.hasMany(Attempt, { foreignKey: 'userId' });
+Attempt.belongsTo(User, { foreignKey: 'userId' });
 
-AssessmentAssignment.hasMany(Report, { foreignKey: 'assessmentAssignmentId' });
-Report.belongsTo(AssessmentAssignment, { foreignKey: 'assessmentAssignmentId' });
-
-Assessment.hasMany(Report, { foreignKey: 'assessmentId' });
-Report.belongsTo(Assessment, { foreignKey: 'assessmentId' });
-
-
-// ProctoringSetting - Attempt (One-to-Many)
-Attempt.hasMany(ProctoringLog, {foreignKey: 'attemptId',as: 'proctoringLogs'});
-
-ProctoringLog.belongsTo(Attempt, {foreignKey: 'attemptId',as: 'attempt'});
-// Export models and sequelize instance
+// Attempt - ProctoringLog (One-to-Many)
+Attempt.hasMany(ProctoringLog, { foreignKey: 'attemptId', as: 'proctoringLogs' });
+ProctoringLog.belongsTo(Attempt, { foreignKey: 'attemptId', as: 'attempt' });
 
 // Assessment - ProctoringSetting (One-to-One)
 Assessment.hasOne(ProctoringSetting, {
@@ -76,19 +77,29 @@ ProctoringSetting.belongsTo(Assessment, {
   foreignKey: 'assessmentId',
   as: 'Assessment'
 });
+
+// Report associations
+User.hasMany(Report, { foreignKey: 'userId' });
+Report.belongsTo(User, { foreignKey: 'userId' });
+
+Assessment.hasMany(Report, { foreignKey: 'assessmentId' });
+Report.belongsTo(Assessment, { foreignKey: 'assessmentId' });
+
+// Export models and sequelize instance
 const models = {
   User,
   Assessment,
   Section,
   Question,
+  QuestionBank,
+  ExternalCodingQuestion,
   Option,
-  AssessmentAssignment,
   Attempt,
   Batch,
   Institute,
   ProctoringSetting,
   Submission,
-  Report, // 🔹 export Report
+  Report,
   ProctoringLog,
   sequelize,
   Sequelize

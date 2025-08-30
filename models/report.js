@@ -15,15 +15,6 @@ module.exports = (sequelize, DataTypes) => {
         },
         onDelete: "CASCADE"
       },
-      assessmentAssignmentId: {
-        type: DataTypes.BIGINT,
-        allowNull: false,
-        references: {
-          model: "assessment_assignments",
-          key: "id"
-        },
-        onDelete: "CASCADE"
-      },
       assessmentId: {
         type: DataTypes.BIGINT,
         allowNull: false,
@@ -62,8 +53,8 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: true,
       indexes: [
         {
-          name: "idx_reports_user_assignment",
-          fields: ["userId", "assessmentAssignmentId"]
+          name: "idx_reports_user_assessment",
+          fields: ["userId", "assessmentId"]
         },
         {
           name: "idx_reports_assessment",

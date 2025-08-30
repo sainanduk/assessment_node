@@ -15,9 +15,10 @@ const assessmentCtrl = new AssessmentController({
   Assessment: db.Assessment,
   Section: db.Section,
   Question: db.Question,
+  QuestionBank: db.QuestionBank,
+  ExternalCodingQuestion: db.ExternalCodingQuestion,
   Option: db.Option,
-  ProctoringSetting: db.ProctoringSetting,
-  AssessmentAssignment: db.AssessmentAssignment
+  ProctoringSetting: db.ProctoringSetting
 });
 
 const sectionCtrl = new SectionController({

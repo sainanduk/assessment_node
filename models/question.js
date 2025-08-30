@@ -15,26 +15,27 @@ module.exports = (sequelize, DataTypes) => {
         },
         onDelete: "CASCADE"
       },
-      questionText: {
-        type: DataTypes.TEXT,
-        allowNull: false
+      questionBankId: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+        references: {
+          model: "question_bank",
+          key: "id"
+        },
+        onDelete: "CASCADE"
+      },
+      questionOrder: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1
       },
       marks: {
         type: DataTypes.INTEGER,
-        defaultValue: 1
+        allowNull: true // Override question bank's default marks if needed
       },
       negativeMarks: {
         type: DataTypes.DECIMAL(3,2),
-        defaultValue: 0
-      },
-      type: {
-        type: DataTypes.ENUM('single_correct', 'multi_correct', 'coding'),
-        allowNull: false,
-        defaultValue: 'single_correct'
-      },
-      metadata: {
-        type: DataTypes.JSONB, // for coding question details or other extra info
-        allowNull: true
+        allowNull: true // Override question bank's default negative marks if needed
       },
       createdAt: {
         type: DataTypes.DATE,
@@ -46,10 +47,13 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           name: "idx_questions_section",
-          fields: ["sectionId"]
+          fields: ["sectionId", "questionOrder"]
+        },
+        {
+          name: "idx_questions_questionbank",
+          fields: ["questionBankId"]
         }
       ]
-      
     });
   
     // Associations are defined in models/index.js

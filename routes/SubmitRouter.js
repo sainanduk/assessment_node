@@ -14,7 +14,6 @@ const submissionCtrl = new SubmissionController({
   Section: db.Section,
   Question: db.Question,
   Option: db.Option,
-  AssessmentAssignment: db.AssessmentAssignment,
   Report: db.Report
 });
 

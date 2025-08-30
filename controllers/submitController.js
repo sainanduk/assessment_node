@@ -11,7 +11,6 @@ class SubmissionController {
     Section, 
     Question, 
     Option,
-    AssessmentAssignment,
     Report
   }) {
     this.sequelize = sequelize;
@@ -21,7 +20,6 @@ class SubmissionController {
     this.Section = Section;
     this.Question = Question;
     this.Option = Option;
-    this.AssessmentAssignment = AssessmentAssignment;
     this.Report = Report;
 
     this.create = this.create.bind(this);
@@ -61,6 +59,7 @@ class SubmissionController {
                 model: this.Question,
                 as: "questions",
                 attributes: ['id'], // Only fetch question ID
+                through: { attributes: [] }, // Don't include junction table attributes
                 include: [
                   {
                     model: this.Option,
@@ -209,14 +208,7 @@ class SubmissionController {
         attempt = JSON.parse(cachedAttempt);
       } else {
         attempt = await this.Attempt.findByPk(attemptId, {
-          attributes: ['id', 'assignmentId', 'userId', 'status'],
-          include: [
-            {
-              model: this.AssessmentAssignment,
-              as: "assignment",
-              attributes: ["id", "assessmentId"]
-            }
-          ],
+          attributes: ['id', 'assessmentId', 'userId', 'status'],
           transaction: t
         });
 
@@ -242,7 +234,7 @@ class SubmissionController {
       }
 
       // Get assessment data with caching
-      const assessmentData = await this.getAssessmentData(attempt.assignment.assessmentId);
+      const assessmentData = await this.getAssessmentData(attempt.assessmentId);
       
       if (!assessmentData) {
         await t.rollback();
@@ -365,15 +357,8 @@ class SubmissionController {
         });
       }
 
-      // Get attempt with assignment details
+      // Get attempt details
       const attempt = await this.Attempt.findByPk(attemptId, {
-        include: [
-          {
-            model: this.AssessmentAssignment,
-            as: "assignment",
-            attributes: ["id", "assessmentId"]
-          }
-        ],
         transaction: t
       });
 
@@ -401,7 +386,7 @@ class SubmissionController {
       });
 
       // Cache assessment data for frequent access (1 hour)
-      const assessmentCacheKey = `assessment:${attempt.assignment.assessmentId}:scoring_data`;
+      const assessmentCacheKey = `assessment:${attempt.assessmentId}:scoring_data`;
       let assessment = null;
       
       const cachedAssessment = await redis.get(assessmentCacheKey);
@@ -409,7 +394,7 @@ class SubmissionController {
         assessment = JSON.parse(cachedAssessment);
       } else {
         // Get assessment with questions, options, and sections for scoring
-        assessment = await this.Assessment.findByPk(attempt.assignment.assessmentId, {
+        assessment = await this.Assessment.findByPk(attempt.assessmentId, {
           include: [
             {
               model: this.Section,
@@ -418,6 +403,7 @@ class SubmissionController {
                 {
                   model: this.Question,
                   as: 'questions',
+                  through: { attributes: [] }, // Don't include junction table attributes
                   include: [
                     {
                       model: this.Option,
@@ -455,8 +441,7 @@ class SubmissionController {
         const existingReport = await this.Report.findOne({
           where: {
             userId: attempt.userId,
-            assessmentAssignmentId: attempt.assignmentId,
-            assessmentId: attempt.assignment.assessmentId
+            assessmentId: attempt.assessmentId
           },
           transaction: t
         });
@@ -472,8 +457,7 @@ class SubmissionController {
           // Create new report with zero score
           report = await this.Report.create({
             userId: attempt.userId,
-            assessmentAssignmentId: attempt.assignmentId,
-            assessmentId: attempt.assignment.assessmentId,
+            assessmentId: attempt.assessmentId,
             score: 0,
             sectionScores: {}
           }, { transaction: t });
@@ -489,7 +473,7 @@ class SubmissionController {
         // Invalidate related caches
         await redis.del(`attempt:${attemptId}`);
         await redis.del(`submissions:attempt:${attemptId}`);
-        await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assignment.assessmentId}`);
+        await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assessmentId}`);
 
         return res.status(200).json({
           data: {
@@ -592,8 +576,7 @@ class SubmissionController {
       const existingReport = await this.Report.findOne({
         where: {
           userId: attempt.userId,
-          assessmentAssignmentId: attempt.assignmentId,
-          assessmentId: attempt.assignment.assessmentId
+          assessmentId: attempt.assessmentId
         },
         transaction: t
       });
@@ -609,8 +592,7 @@ class SubmissionController {
         // Create new report
         report = await this.Report.create({
           userId: attempt.userId,
-          assessmentAssignmentId: attempt.assignmentId,
-          assessmentId: attempt.assignment.assessmentId,
+          assessmentId: attempt.assessmentId,
           score: totalScore,
           sectionScores: sectionScores
         }, { transaction: t });
@@ -626,7 +608,7 @@ class SubmissionController {
       // Invalidate related caches
       await redis.del(`attempt:${attemptId}`);
       await redis.del(`submissions:attempt:${attemptId}`);
-      await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assignment.assessmentId}`);
+              await redis.del(`reports:user:${attempt.userId}:assessment:${attempt.assessmentId}`);
 
       return res.status(200).json({
         data: {

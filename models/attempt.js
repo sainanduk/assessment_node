@@ -6,11 +6,11 @@ module.exports = (sequelize, DataTypes) => {
         autoIncrement: true,
         primaryKey: true
       },
-      assignmentId: {
+      assessmentId: {
         type: DataTypes.BIGINT,
         allowNull: false,
         references: {
-          model: "assessment_assignments",
+          model: "assessments",
           key: "id"
         }
       },
@@ -61,8 +61,8 @@ module.exports = (sequelize, DataTypes) => {
       timestamps: false,
       indexes: [
         {
-          name: "idx_attempts_assignment_user",
-          fields: ["assignmentId", "userId"]
+          name: "idx_attempts_assessment_user",
+          fields: ["assessmentId", "userId"]
         },
         {
           name: "idx_attempts_status",

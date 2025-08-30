@@ -23,6 +23,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true
       },
+      type: {
+        type: DataTypes.ENUM('coding', 'noncoding'),
+        allowNull: false,
+        defaultValue: 'noncoding'
+      },
       sectionOrder: {
         type: DataTypes.INTEGER,
         allowNull: false
@@ -50,6 +55,10 @@ module.exports = (sequelize, DataTypes) => {
         {
           name: "idx_sections_assessment",
           fields: ["assessmentId", "sectionOrder"]
+        },
+        {
+          name: "idx_sections_type",
+          fields: ["type"]
         }
       ]
       

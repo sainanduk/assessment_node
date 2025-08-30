@@ -9,7 +9,6 @@ const router = express.Router();
 const attemptCtrl = new AttemptController({
   sequelize: db.sequelize,
   Attempt: db.Attempt,
-  AssessmentAssignment: db.AssessmentAssignment,
   Assessment: db.Assessment,
   User: db.User,
 });
