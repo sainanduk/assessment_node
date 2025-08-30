@@ -17,6 +17,9 @@ const Submission = require('./submission')(sequelize, DataTypes);
 const Report = require('./report')(sequelize, DataTypes);
 const ProctoringLog = require('./proctoringlog')(sequelize, DataTypes); 
 
+// Debug: Check if models are properly initialized
+console.log("Models initialized - QuestionBank:", !!QuestionBank, "Option:", !!Option); 
+
 // Define associations
 // User - Assessment (One-to-Many)
 
@@ -89,8 +92,8 @@ const models = {
   User,
   Assessment,
   Section,
-  Question,
   QuestionBank,
+  Question,
   ExternalCodingQuestion,
   Option,
   Attempt,

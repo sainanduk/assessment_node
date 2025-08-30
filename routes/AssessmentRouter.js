@@ -48,27 +48,27 @@ router.patch('/assessments/:id', assessmentCtrl.update);
 router.delete('/assessments/:id', assessmentCtrl.remove);
 
 // Section routes
-router.get('/sections', sectionCtrl.list);
-router.get('/sections/:id', sectionCtrl.get);
-router.post('/sections', sectionCtrl.create);
-router.put('/sections/:id', sectionCtrl.update);
-router.patch('/sections/:id', sectionCtrl.update);
-router.delete('/sections/:id', sectionCtrl.remove);
+// router.get('/sections', sectionCtrl.list);
+// router.get('/sections/:id', sectionCtrl.get);
+// router.post('/sections', sectionCtrl.create);
+// router.put('/sections/:id', sectionCtrl.update);
+// router.patch('/sections/:id', sectionCtrl.update);
+// router.delete('/sections/:id', sectionCtrl.remove);
 
 // Question routes
-router.get('/questions', questionCtrl.list);
-router.get('/questions/:id', questionCtrl.get);
-router.post('/questions', questionCtrl.create);
-router.put('/questions/:id', questionCtrl.update);
-router.patch('/questions/:id', questionCtrl.update);
-router.delete('/questions/:id', questionCtrl.remove);
+// router.get('/questions', questionCtrl.list);
+// router.get('/questions/:id', questionCtrl.get);
+// router.post('/questions', questionCtrl.create);
+// router.put('/questions/:id', questionCtrl.update);
+// router.patch('/questions/:id', questionCtrl.update);
+// router.delete('/questions/:id', questionCtrl.remove);
 
 // Option routes
-router.get('/options', optionCtrl.list);
-router.get('/options/:id', optionCtrl.get);
-router.post('/options', optionCtrl.create);
-router.put('/options/:id', optionCtrl.update);
-router.patch('/options/:id', optionCtrl.update);
-router.delete('/options/:id', optionCtrl.remove);
+// router.get('/options', optionCtrl.list);
+// router.get('/options/:id', optionCtrl.get);
+// router.post('/options', optionCtrl.create);
+// router.put('/options/:id', optionCtrl.update);
+// router.patch('/options/:id', optionCtrl.update);
+// router.delete('/options/:id', optionCtrl.remove);
 
 module.exports = router;

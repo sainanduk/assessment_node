@@ -15,14 +15,6 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'single_correct'
     },
-    marks: {
-      type: DataTypes.INTEGER,
-      defaultValue: 1
-    },
-    negativeMarks: {
-      type: DataTypes.DECIMAL(3,2),
-      defaultValue: 0
-    },
     difficulty: {
       type: DataTypes.ENUM('easy', 'medium', 'hard'),
       allowNull: true

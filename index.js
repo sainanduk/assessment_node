@@ -9,7 +9,7 @@ const assessmentRoutes = require('./routes/AssessmentRouter'); // central router
 const institueRoutes = require('./routes/InstituteRouter');
 const batchroutes = require('./routes/BatchRouter');
 const userRoutes = require('./routes/UserRouter');
-
+const questionRoutes = require('./routes/QuestionRouter');
 const AttemptRouter = require('./routes/AttemptRouter');
 const submitRoutes = require('./routes/SubmitRouter');
 
@@ -32,7 +32,7 @@ app.use('/api', batchroutes);
 app.use('/api', userRoutes);
 app.use('/api', AttemptRouter);
 app.use('/api', submitRoutes);
-
+app.use('/api', questionRoutes);
 // 404 handler for unknown routes
 app.use((req, res, next) => {
   return res.status(404).json({ error: 'NotFound', path: req.originalUrl });

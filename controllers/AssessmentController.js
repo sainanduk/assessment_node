@@ -25,14 +25,18 @@ class AssessmentController {
   // ---------- LIST ----------
   async list(req, res) {
     try {
-      const cacheKey = `assessments:list:${req.user.batchId}:${req.user.instituteId}`;
+      const { limit, offset } = Utils.parsePagination(req.query);
+  
+      // Build cache key with pagination + filters
+      const cacheKey = `assessments:list:${req.user.batchId}:${req.user.instituteId}:${limit}:${offset}:${req.query.status || ''}:${req.query.q || ''}:${req.query.startFrom || ''}:${req.query.startTo || ''}`;
+  
       const cached = await redis.get(cacheKey);
-
       if (cached) {
         return res.json(JSON.parse(cached));
       }
-
-      const { limit, offset } = Utils.parsePagination(req.query);
+      console.log("Not cached");
+  
+      // Build filters
       const where = {};
       if (req.query.status) where.status = req.query.status;
       if (req.query.q) where.title = { [Op.iLike]: `%${req.query.q}%` };
@@ -41,29 +45,48 @@ class AssessmentController {
         if (req.query.startFrom) where.startTime[Op.gte] = new Date(req.query.startFrom);
         if (req.query.startTo) where.startTime[Op.lte] = new Date(req.query.startTo);
       }
-      where.type = 'assessment';
+      where.type = "assessment";
+  
+      // Fetch from DB
       const { rows, count } = await this.Assessment.findAndCountAll({
         where,
         limit,
         offset,
-        order: [['createdAt', 'DESC']],
-        exclude: ['instituteId', 'batchId','status','show_results',
-           'createdBy','createdAt', 'updatedAt','type',,'shuffle_questions', 'shuffle_options']
+        attributes: {
+          exclude: [
+            "instituteId",
+            "batchId",
+            "status",
+            "show_results",
+            "createdBy",
+            "createdAt",
+            "updatedAt",
+            "type",
+            "shuffle_questions",
+            "shuffle_options"
+          ]
+        },
+        order: [["createdAt", "DESC"]]
       });
-
+  
+      console.log("Assessments list:", rows);
+  
       const response = {
         data: rows,
         page: Math.floor(offset / limit) + 1,
         limit,
         total: count
       };
-
-      await redis.set(cacheKey, JSON.stringify(response), 'EX', 60); // cache for 1 min
+  
+      // Cache the response for 1 minute
+      await redis.set(cacheKey, JSON.stringify(response), "EX", 60);
+  
       return res.json(response);
     } catch (err) {
       return Utils.handleSequelizeError(err, res);
     }
   }
+  
 
   // ---------- GET ----------
   async get(req, res) {
