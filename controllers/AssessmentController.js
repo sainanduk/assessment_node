@@ -25,7 +25,7 @@ class AssessmentController {
   // ---------- LIST ----------
   async list(req, res) {
     try {
-      const cacheKey = `assessments:list:${JSON.stringify(req.query)}`;
+      const cacheKey = `assessments:list:${req.user.batchId}:${req.user.instituteId}`;
       const cached = await redis.get(cacheKey);
 
       if (cached) {
@@ -46,7 +46,9 @@ class AssessmentController {
         where,
         limit,
         offset,
-        order: [['createdAt', 'DESC']]
+        order: [['createdAt', 'DESC']],
+        exclude: ['instituteId', 'batchId','status','show_results',
+           'createdBy','createdAt', 'updatedAt','type',,'shuffle_questions', 'shuffle_options']
       });
 
       const response = {
@@ -129,7 +131,7 @@ class AssessmentController {
     try {
       const { 
         title, description, instructions, totalMarks = 0, duration, passing_score,
-        status = 'draft', startTime, endTime, proctoring, sections, instituteId, batchId
+        status = 'draft', startTime, endTime, proctoring, sections, instituteId, batchId, section_time_limit
       } = req.body;
   
       if (!title || typeof title !== "string" || !title.trim()) {
@@ -192,8 +194,8 @@ class AssessmentController {
       if (proctoring) {
         await this.ProctoringSetting.create({ assessmentId: assessment.id, ...proctoring }, { transaction: t });
       }
-  
-      
+      if(section_time_limit){
+        
         if (Array.isArray(sections) && sections.length > 0) {
     // ✅ Sum all section time limits
     const totalSectionTime = sections.reduce((sum, s) => {
@@ -207,6 +209,7 @@ class AssessmentController {
         message: `Sum of section time limits (${totalSectionTime} mins) must equal assessment duration (${duration} mins).`
       });
     }
+  }
     // sum all section marks
     const totalSectionMarks = sections.reduce((sum, s) => {
       const marks = s.marks ?? 0;
@@ -280,7 +283,7 @@ class AssessmentController {
           type: s.type ?? "noncoding",
           sectionOrder: s.sectionOrder,
           marks: s.marks ?? 0,
-          timeLimit: s.timeLimit,
+          timeLimit: s.timeLimit??null,
           instructions: s.instructions ?? null,
           question_count: s.question_count ?? 1
         },

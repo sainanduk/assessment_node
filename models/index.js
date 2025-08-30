@@ -19,8 +19,7 @@ const ProctoringLog = require('./proctoringlog')(sequelize, DataTypes);
 
 // Define associations
 // User - Assessment (One-to-Many)
-User.hasMany(Assessment, { foreignKey: 'userId' });
-Assessment.belongsTo(User, { foreignKey: 'userId' });
+
 
 // Assessment - Section (One-to-Many)
 Assessment.hasMany(Section, { foreignKey: 'assessmentId', as: 'sections' });

@@ -31,5 +31,21 @@ redis.on('error', (err) => {
 redis.on('close', () => {
   console.warn('⚠️ Redis connection closed');
 });
+// redis.flushdb()
 
+//   .then(() => {
+
+//     console.log('Redis cache cleared (current DB)');
+
+//     process.exit(0);
+
+//   })
+
+//   .catch((err) => {
+
+//     console.error('Error clearing Redis cache:', err);
+
+//     process.exit(1);
+
+//   });
 module.exports = redis;
