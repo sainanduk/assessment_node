@@ -1,5 +1,6 @@
 
 
+
 // models/assessment.js
 module.exports = (sequelize, DataTypes) => {
     const Assessment = sequelize.define("Assessment", {
@@ -114,6 +115,10 @@ module.exports = (sequelize, DataTypes) => {
       updatedAt: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW
+      },
+      createdBy: {
+        type:DataTypes.UUID,
+        allowNull: false
       }
     }, {
       tableName: "assessments",
