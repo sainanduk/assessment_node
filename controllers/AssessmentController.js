@@ -41,7 +41,7 @@ class AssessmentController {
         if (req.query.startFrom) where.startTime[Op.gte] = new Date(req.query.startFrom);
         if (req.query.startTo) where.startTime[Op.lte] = new Date(req.query.startTo);
       }
-
+      where.type = 'assessment';
       const { rows, count } = await this.Assessment.findAndCountAll({
         where,
         limit,
@@ -125,10 +125,11 @@ class AssessmentController {
   // ---------- CREATE ----------
   async create(req, res) {
     const t = await this.sequelize.transaction();
+    const  userId  = req.user.userId;
     try {
       const { 
         title, description, instructions, totalMarks = 0, duration, passing_score,
-        status = 'draft', startTime, endTime, proctoring, sections 
+        status = 'draft', startTime, endTime, proctoring, sections, instituteId, batchId
       } = req.body;
   
       if (!title || typeof title !== "string" || !title.trim()) {
@@ -170,10 +171,20 @@ class AssessmentController {
       if(!sections || sections.length<=0){
         return res.status(400).json({ success: false, message: "Atleast one section should be present" });
       }
+      if(totalMarks<=0){
+        return res.status(400).json({ success: false, message: "Total marks must be greater than 0" });
+      }
+      if(passing_score<=0){
+        return res.status(400).json({ success: false, message: "Passing score must be greater than 0" });
+      }
+      if(passing_score>totalMarks){
+        return res.status(400).json({ success: false, message: "Passing score must be less than total marks" });
+      }
+    
   
       // ✅ Create Assessment
       const assessment = await this.Assessment.create(
-        { title, description, instructions, totalMarks, duration, passing_score,section_count:section_count, status, startTime: start, endTime: end },
+        { title, description, instructions, totalMarks, duration, passing_score,section_count:sections.length, status, startTime: start, endTime: end , createdBy:userId, instituteId, batchId },
         { transaction: t }
       );
   
@@ -189,7 +200,6 @@ class AssessmentController {
       const time = s.timeLimit ?? 0;
       return sum + (typeof time === "number" && time > 0 ? time : 0);
     }, 0);
-
     if (totalSectionTime !== duration) {
       await t.rollback();
       return res.status(400).json({
@@ -197,6 +207,19 @@ class AssessmentController {
         message: `Sum of section time limits (${totalSectionTime} mins) must equal assessment duration (${duration} mins).`
       });
     }
+    // sum all section marks
+    const totalSectionMarks = sections.reduce((sum, s) => {
+      const marks = s.marks ?? 0;
+      return sum + (typeof marks === "number" && marks > 0 ? marks : 0);
+    }, 0);
+    if(totalSectionMarks!==totalMarks){
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Sum of section marks (${totalSectionMarks}) must equal total marks (${totalMarks}).`
+      });
+    }
+
 
     for (const s of sections) {
       // ✅ Validate name
@@ -241,6 +264,12 @@ class AssessmentController {
         await t.rollback();
         return res.status(400).json({ success: false, message: "Each section must have a valid positive timeLimit." });
       }
+      // ✅ Validate question_count
+      if (s.question_count === undefined || s.question_count === null || s.question_count <= 0) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: "Each section must have a valid positive question_count." });
+      }
+
 
       // ✅ Create section
       const section = await this.Section.create(
@@ -252,7 +281,8 @@ class AssessmentController {
           sectionOrder: s.sectionOrder,
           marks: s.marks ?? 0,
           timeLimit: s.timeLimit,
-          instructions: s.instructions ?? null
+          instructions: s.instructions ?? null,
+          question_count: s.question_count ?? 1
         },
         { transaction: t }
       );

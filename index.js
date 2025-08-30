@@ -51,7 +51,7 @@ async function start() {
   try {
     // Prefer authenticate() here; manage schema via migrations
     await db.sequelize.authenticate();
-    // await db.sequelize.sync({force:true}); // avoid in production
+    // await db.sequelize.sync({alter:true}); // avoid in production
 
     app.listen(PORT, () => {
       console.log(`Server listening on port ${PORT}`);

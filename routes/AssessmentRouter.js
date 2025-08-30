@@ -1,3 +1,5 @@
+const { authenticateToken } = require('../middleware/auth');
+
 // routes/index.js
 const express = require('express');
 const db = require('../models');
@@ -38,9 +40,9 @@ const optionCtrl = new OptionController({
 });
 
 // Assessment routes
-router.get('/assessments', assessmentCtrl.list);
-router.get('/assessments/:assessment_id', assessmentCtrl.get);
-router.post('/assessments', assessmentCtrl.create);
+router.get('/assessments', authenticateToken, assessmentCtrl.list);
+router.get('/assessments/:assessment_id', authenticateToken, assessmentCtrl.get);
+router.post('/assessments', authenticateToken, assessmentCtrl.create);
 router.put('/assessments/:id', assessmentCtrl.update);
 router.patch('/assessments/:id', assessmentCtrl.update);
 router.delete('/assessments/:id', assessmentCtrl.remove);

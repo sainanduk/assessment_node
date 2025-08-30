@@ -39,11 +39,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 85,
         comment: 'Duration in minutes'
       },
-      total_questions: {
-        type: DataTypes.INTEGER,
-        allowNull: false,
-        defaultValue: 0
-      },
+      
       passing_score: {
         type: DataTypes.INTEGER,
         allowNull: true
@@ -98,7 +94,7 @@ module.exports = (sequelize, DataTypes) => {
       type: {
         type: DataTypes.ENUM('quiz', 'exam', 'assignment','assessment'),
         allowNull: false,
-        defaultValue: 'assignment'
+        defaultValue: 'assessment'
       },
       startTime: {
         type: DataTypes.DATE,

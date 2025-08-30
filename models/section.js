@@ -36,6 +36,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         defaultValue: 0
       },
+      question_count: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1
+      },
       timeLimit: {
         type: DataTypes.INTEGER,
         allowNull: true // in minutes
