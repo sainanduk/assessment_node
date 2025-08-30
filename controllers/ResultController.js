@@ -272,7 +272,7 @@ class ReportController {
       const reportData = {
         score: parseFloat(totalScore.toFixed(2)),
         sectionScores,
-        updatedAt: new Date()
+        updatedAt: new Date(new Date()+ 5.5 * 60 * 60 * 1000)
       };
 
       if (report) {
@@ -286,7 +286,7 @@ class ReportController {
           assessmentAssignmentId: attempt.assignmentId,
           assessmentId: attempt.assignment.assessmentId,
           ...reportData,
-          createdAt: new Date()
+          createdAt: new Date(new Date()+ 5.5 * 60 * 60 * 1000)
         }, { transaction: t });
       }
 

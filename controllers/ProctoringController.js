@@ -391,7 +391,7 @@ class ProctoringLogController {
   // ---------- AUTO SUBMIT AND CALCULATE SCORE ----------
   async autoSubmitAndCalculateScore(attempt, proctoringSettings, violationType, transaction) {
     try {
-      const currentTime = new Date();
+      const currentTime = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
       const timeSpent = Math.floor((currentTime - new Date(attempt.startedAt)) / 1000);
 
       // Update attempt status to auto_submitted

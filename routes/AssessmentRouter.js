@@ -20,7 +20,7 @@ const assessmentCtrl = new AssessmentController({
   QuestionBank: db.QuestionBank,
   ExternalCodingQuestion: db.ExternalCodingQuestion,
   Option: db.Option,
-  ProctoringSetting: db.ProctoringSetting
+  ProctoringSetting: db.ProctoringSetting,
 });
 
 const sectionCtrl = new SectionController({

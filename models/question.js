@@ -30,7 +30,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 1
       },
       marks: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.FLOAT,
         allowNull: true // Override question bank's default marks if needed
       },
       negativeMarks: {

@@ -12,7 +12,7 @@ const userRoutes = require('./routes/UserRouter');
 const questionRoutes = require('./routes/QuestionRouter');
 const AttemptRouter = require('./routes/AttemptRouter');
 const submitRoutes = require('./routes/SubmitRouter');
-
+const sectionRouter = require('./routes/SectionRouter');
 
 const app = express();
 
@@ -33,6 +33,7 @@ app.use('/api', userRoutes);
 app.use('/api', AttemptRouter);
 app.use('/api', submitRoutes);
 app.use('/api', questionRoutes);
+app.use('/api', sectionRouter);
 // 404 handler for unknown routes
 app.use((req, res, next) => {
   return res.status(404).json({ error: 'NotFound', path: req.originalUrl });

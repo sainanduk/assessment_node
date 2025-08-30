@@ -4,6 +4,7 @@ const redis = require("../config/redis");
 
 class SubmissionController {
   constructor({ 
+    QuestionBank,
     sequelize, 
     Submission, 
     Attempt, 
@@ -21,6 +22,7 @@ class SubmissionController {
     this.Question = Question;
     this.Option = Option;
     this.Report = Report;
+    this.QuestionBank = QuestionBank;
 
     this.create = this.create.bind(this);
     this.getAssessmentData = this.getAssessmentData.bind(this);
@@ -47,24 +49,34 @@ class SubmissionController {
         };
       }
 
-      const assessment = await this.Assessment.findByPk(assessmentId, {
-        attributes: ['id'], // Only fetch assessment ID
+      const assessment = await this.Assessment.findOne({where: {assessmentId}, 
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
         include: [
           {
             model: this.Section,
-            as: "sections",
-            attributes: ['id'], // Only fetch section ID
+            as: 'sections',
+            attributes: { exclude: ['createdAt', 'updatedAt'] },
+            separate: true,
+            order: [['sectionOrder', 'ASC']],
             include: [
               {
                 model: this.Question,
-                as: "questions",
-                attributes: ['id'], // Only fetch question ID
-                through: { attributes: [] }, // Don't include junction table attributes
+                as: 'questions',
+                attributes: { exclude: ['createdAt', 'updatedAt'] },
+                separate: true,
                 include: [
                   {
-                    model: this.Option,
-                    as: "options",
-                    attributes: ['id'] // Only fetch option ID
+                    model: this.QuestionBank,
+                    as: 'questionBank',
+                    attributes: { exclude: ['createdAt', 'updatedAt'] },
+                    include: [
+                      {
+                        model: this.Option,
+                        as: 'options',
+                        attributes: { exclude: ['createdAt', 'updatedAt'] },
+                        order: [['optionOrder', 'ASC']]
+                      }
+                    ]
                   }
                 ]
               }
@@ -80,36 +92,30 @@ class SubmissionController {
       // Transform data for O(1) lookup efficiency
       const assessmentData = {
         id: assessment.id,
-        validQuestions: new Set(), // For O(1) question validation
-        validOptions: new Set(),   // For O(1) option validation
-        questionToOptions: {},     // Map question ID to its valid option IDs
-        optionToQuestion: {}       // Map option ID to its question ID
+        validQuestions: new Set(),
+        validOptions: new Set(),
+        questionToOptions: {},
+        optionToQuestion: {},
+        questionToSection: {} // NEW
       };
-
+      
       assessment.sections.forEach(section => {
         section.questions.forEach(question => {
           const questionId = question.id;
-          
-          // Add question to valid set
           assessmentData.validQuestions.add(questionId);
-          
-          // Initialize options array for this question
+          assessmentData.questionToSection[questionId] = section.id; // NEW
+      
           assessmentData.questionToOptions[questionId] = [];
-          
-          question.options.forEach(option => {
+      
+          question.questionBank.options.forEach(option => { // FIX: access through questionBank
             const optionId = option.id;
-            
-            // Add option to valid set
             assessmentData.validOptions.add(optionId);
-            
-            // Map option to question
             assessmentData.optionToQuestion[optionId] = questionId;
-            
-            // Add option to question's options array
             assessmentData.questionToOptions[questionId].push(optionId);
           });
         });
       });
+      
 
       // Convert Sets to Arrays for JSON serialization
       const serializedData = {
@@ -132,45 +138,42 @@ class SubmissionController {
   }
 
   // ---------- VALIDATE SUBMISSION (OPTIMIZED) ----------
-  async validateSubmission(assessmentData, questionId, selectedOptions) {
-    // Check if question exists in assessment - O(1) lookup
-    if (!assessmentData.validQuestions.has(questionId)) {
-      return {
-        valid: false,
-        error: "Question not found in assessment"
-      };
+  async validateSubmission(assessmentData, sectionId, questionId, selectedOptions) {
+    if (!assessmentData || !sectionId || !questionId || !Array.isArray(selectedOptions)) {
+      return { valid: false, error: "Invalid submission data" };
     }
-
-    // Validate selected options
-    if (selectedOptions && selectedOptions.length > 0) {
-      for (const optionId of selectedOptions) {
-        // Check if option exists - O(1) lookup
-        if (!assessmentData.validOptions.has(optionId)) {
-          return {
-            valid: false,
-            error: `Option ${optionId} not found`
-          };
-        }
-        
-        // Check if option belongs to the question - O(1) lookup
-        if (assessmentData.optionToQuestion[optionId] !== questionId) {
-          return {
-            valid: false,
-            error: `Option ${optionId} does not belong to question ${questionId}`
-          };
-        }
+  
+    // Question existence
+    if (!assessmentData.validQuestions.has(questionId)) {
+      return { valid: false, error: `Question ${questionId} not found in assessment` };
+    }
+  
+    // Section consistency
+    if (assessmentData.questionToSection[questionId] !== sectionId) {
+      return { valid: false, error: `Question ${questionId} does not belong to Section ${sectionId}` };
+    }
+  
+    // Option validation
+    for (const optionId of selectedOptions) {
+      if (!assessmentData.validOptions.has(optionId)) {
+        return { valid: false, error: `Option ${optionId} not found in assessment` };
+      }
+      if (assessmentData.optionToQuestion[optionId] !== questionId) {
+        return { valid: false, error: `Option ${optionId} does not belong to Question ${questionId}` };
       }
     }
-
+  
     return { valid: true };
   }
+  
 
   // ---------- CREATE SUBMISSION ----------
   async create(req, res) {
     const t = await this.sequelize.transaction();
     
     try {
-      const { attemptId, questionId, selectedOptions } = req.body;
+      const { attemptId, questionId, sectionId, selectedOptions } = req.body;
+      // const userId = req.user.userId;
 
       // Basic validation
       if (!attemptId || !questionId) {
@@ -232,9 +235,16 @@ class SubmissionController {
           details: "Cannot submit to a completed attempt"
         });
       }
-
+      const assessmentCacheKey = `assessment:${attempt.assessmentId}`;
+      let assessmentData = null;
+      const cachedAssessment = await redis.get(assessmentCacheKey);
+      if (cachedAssessment) {
+        assessmentData = JSON.parse(cachedAssessment);
+      } else {
+        assessmentData = await this.getAssessmentData(attempt.assessmentId);
+        await redis.set(assessmentCacheKey, JSON.stringify(assessmentData), "EX", 3600);
+      }
       // Get assessment data with caching
-      const assessmentData = await this.getAssessmentData(attempt.assessmentId);
       
       if (!assessmentData) {
         await t.rollback();
@@ -245,7 +255,7 @@ class SubmissionController {
       }
 
       // Validate submission
-      const validation = await this.validateSubmission(assessmentData, questionId, selectedOptions);
+      const validation = await this.validateSubmission(assessmentData, sectionId, questionId, selectedOptions);
       if (!validation.valid) {
         await t.rollback();
         return res.status(400).json({
@@ -268,7 +278,7 @@ class SubmissionController {
       if (existingSubmission) {
         // Update existing submission
         existingSubmission.selectedOptions = selectedOptions;
-        existingSubmission.submittedAt = new Date();
+        existingSubmission.submittedAt = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
         await existingSubmission.save({ transaction: t });
         submission = existingSubmission;
       } else {
@@ -277,7 +287,7 @@ class SubmissionController {
           attemptId,
           questionId,
           selectedOptions,
-          submittedAt: new Date()
+          submittedAt: new Date(new Date()+ 5.5 * 60 * 60 * 1000)
         }, { transaction: t });
       }
 
@@ -465,7 +475,7 @@ class SubmissionController {
 
         // Mark attempt as completed
         attempt.status = 'completed';
-        attempt.completedAt = new Date();
+        attempt.completedAt = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
         await attempt.save({ transaction: t });
 
         await t.commit();
@@ -600,7 +610,7 @@ class SubmissionController {
 
       // Mark attempt as completed
       attempt.status = 'completed';
-      attempt.completedAt = new Date();
+      attempt.completedAt = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
       await attempt.save({ transaction: t });
 
       await t.commit();

@@ -95,8 +95,8 @@ class AttemptController {
 async create(req, res) {
   const t = await this.sequelize.transaction();
   try {
-    const { ipAddress, userAgent } = req.body;
-    const { userId } = req.body; // from middleware
+    // const { ipAddress, userAgent } = req.body;
+    const { userId } = req.user.userId; // from middleware
     const { assessmentId } = req.params;
     console.log("Create attempt called with", { assessmentId, userId });
     
@@ -106,7 +106,7 @@ async create(req, res) {
     }
 
     // 🔹 Step 1: Check cache for assessment
-    const cacheKeyAssessment = `assessment:${assessmentId}`;
+    const cacheKeyAssessment = `assessment:${assessmentId}:${req.user.batchId}:${req.user.instituteId}`;
 
     let assessmentData = await redis.get(cacheKeyAssessment);
 
@@ -148,7 +148,7 @@ async create(req, res) {
     const allowed = Number(assessmentData.attemptsAllowed ?? 1);
 
     // 🔹 Step 3: Gate by time/status
-    const now = new Date();
+    const now = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
     if (assessmentData.startTime && now < new Date(assessmentData.startTime)) {
       await t.rollback();
       return res.status(403).json({ error: 'Forbidden', message: 'Assessment not started yet' });
@@ -178,8 +178,8 @@ async create(req, res) {
       userId,
       attemptNumber: attemptsCount + 1,
       status: 'in_progress',
-      ipAddress: ipAddress || (req.ip ?? null),
-      userAgent: userAgent || (req.get?.('user-agent') ?? null)
+      ipAddress:  (req.ip ?? null),
+      userAgent: (req.get?.('user-agent') ?? null)
     }, { transaction: t });
 
     await t.commit();
@@ -205,7 +205,7 @@ async create(req, res) {
     const t = await this.sequelize.transaction();
     try {
       const { id } = req.params;
-      const { auto = false, totalTimeSpent } = req.body || {};
+      const { auto = false } = req.body || {};
       const attempt = await this.Attempt.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
       if (!attempt) {
         await t.rollback();
@@ -217,8 +217,8 @@ async create(req, res) {
       }
 
       attempt.status = auto ? 'auto_submitted' : 'submitted';
-      attempt.submittedAt = new Date();
-      if (typeof totalTimeSpent === 'number') attempt.totalTimeSpent = totalTimeSpent;
+      attempt.submittedAt = new Date(new Date()+ 5.5 * 60 * 60 * 1000);
+      attempt.totalTimeSpent = Math.floor((attempt.submittedAt - attempt.startedAt) / 1000);
 
       await attempt.save({ transaction: t });
       await t.commit();

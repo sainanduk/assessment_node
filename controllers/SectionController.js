@@ -1,10 +1,11 @@
 // controllers/SectionController.js
 
 class SectionController {
-  constructor({ Section, Question, Option, QuestionBank }) {
+  constructor({ Section, Question, Option, QuestionBank, Assessment }) {
     this.Section = Section;
     this.Question = Question;
     this.Option = Option;
+    this.Assessment = Assessment;
     this.QuestionBank = QuestionBank;
 
     this.list = this.list.bind(this);

@@ -1,8 +1,9 @@
+
 // routes/section.js
 const express = require("express");
 const db = require("../models");
 const SectionController = require("../controllers/SectionController");
-
+const { authenticateToken } = require("../middleware/auth");
 const router = express.Router();
 
 // Instantiate controller with dependencies
@@ -11,6 +12,7 @@ const sectionCtrl = new SectionController({
   Question: db.Question,
   Option: db.Option,
   QuestionBank: db.QuestionBank,
+  Assessment: db.Assessment,
 });
 
 // ---------- ROUTES ----------
@@ -23,6 +25,6 @@ router.patch("/sections/:id", sectionCtrl.update);
 router.delete("/sections/:id", sectionCtrl.remove);
 
 // New route for adding questions to section from question bank
-router.post("/sections/questions", sectionCtrl.sectionQuestions);
+router.post("/sections/questions", authenticateToken, sectionCtrl.sectionQuestions);
 
 module.exports = router;
