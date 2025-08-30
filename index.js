@@ -9,7 +9,7 @@ const assessmentRoutes = require('./routes/AssessmentRouter'); // central router
 const institueRoutes = require('./routes/InstituteRouter');
 const batchroutes = require('./routes/BatchRouter');
 const userRoutes = require('./routes/UserRouter');
-const assessmentAssignmentRoutes = require('./routes/AssessmentAssignmentRouter');
+
 const AttemptRouter = require('./routes/AttemptRouter');
 const submitRoutes = require('./routes/SubmitRouter');
 
@@ -30,7 +30,6 @@ app.use('/api', assessmentRoutes);
 app.use('/api', institueRoutes);
 app.use('/api', batchroutes);
 app.use('/api', userRoutes);
-app.use('/api', assessmentAssignmentRoutes);
 app.use('/api', AttemptRouter);
 app.use('/api', submitRoutes);
 
