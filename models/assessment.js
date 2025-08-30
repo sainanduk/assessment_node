@@ -1,3 +1,5 @@
+import batch from "./batch";
+
 // models/assessment.js
 module.exports = (sequelize, DataTypes) => {
     const Assessment = sequelize.define("Assessment", {
@@ -13,6 +15,22 @@ module.exports = (sequelize, DataTypes) => {
       description: {
         type: DataTypes.TEXT,
         allowNull: true
+      },
+      instituteId: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: {
+          model: "institutes",
+          key: "id"
+        }
+      },
+      batchId: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+        references: {
+          model: "batches",
+          key: "id"
+        }
       },
       duration: {
         type: DataTypes.INTEGER,
